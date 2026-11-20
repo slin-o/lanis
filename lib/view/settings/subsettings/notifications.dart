@@ -25,6 +25,7 @@ final Map<String, dynamic> _notificationDefaults = {
   "notifications-end-time": Platform.isIOS ? [16, 30] : [15, 0],
 };
 
+
 class NotificationSettings extends ConsumerSettingsColours {
   final int? accountCount;
   final bool showBackButton;

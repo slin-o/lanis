@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:liblanis/liblanis.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:lanis/applets/definitions.dart';
@@ -13,6 +14,7 @@ import 'package:lanis/bridge/legacy_storage_cleanup.dart';
 import 'package:lanis/l10n/account_type_ui.dart';
 import 'package:lanis/utils/logger.dart';
 import 'package:lanis/utils/privacy_policy.dart';
+import 'package:lanis/router.dart';
 
 const _oneShotTaskId = 'com.transistorsoft.notftask';
 
@@ -119,6 +121,18 @@ Future<void> setupBackgroundService() async {
     container.dispose();
   }
 }
+void _openRedirectUri(String? redirectUri) {
+  if (redirectUri == null) return;
+  final context = rootNavigatorKey.currentContext;
+  if (context == null || !context.mounted) return;
+  context.go(redirectUri);
+}
+
+String? _getRedirectUriFromPayload(String? payload) {
+  if (payload == null) return null;
+  final payloadData = JsonDecoder().convert(payload);
+  return payloadData['redirectUri'] as String?;
+}
 
 Future<void> initializeNotifications() async {
   try {
@@ -131,6 +145,10 @@ Future<void> initializeNotifications() async {
           requestSoundPermission: true,
         ),
       ),
+      onDidReceiveNotificationResponse: (details) {
+        final redirectUri = _getRedirectUriFromPayload(details.payload);
+        _openRedirectUri(redirectUri);
+      },
     );
   } catch (e, s) {
     backgroundLogger.e(e, stackTrace: s);
@@ -271,6 +289,7 @@ class BackgroundTaskToolkit {
     bool avoidDuplicateSending = false,
     Importance importance = Importance.high,
     Priority priority = Priority.high,
+    String? redirectUri,
   }) async {
     if (id > 10000 || id < 0) {
       throw ArgumentError('id must be between 0 and 10000');
@@ -287,6 +306,8 @@ class BackgroundTaskToolkit {
       }
       settings.setString(key, hash);
     }
+    final payloadData = {'redirectUri': redirectUri};
+    final payload = JsonEncoder().convert(payloadData);
     try {
       final androidDetails = AndroidNotificationDetails(
         'io.github.alessioc42.sphplan',
@@ -309,6 +330,7 @@ class BackgroundTaskToolkit {
           android: androidDetails,
           iOS: iOSDetails,
         ),
+        payload: payload,
       );
     } catch (e, s) {
       backgroundLogger.e(e, stackTrace: s);
